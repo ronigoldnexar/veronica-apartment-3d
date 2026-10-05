@@ -100,7 +100,7 @@ pre.code{font:12px/1.5 var(--f-mono);background:var(--tint);border:1px solid var
 <body>
 <div class="wrap">
 <header class="top">
-  <h1>Sketch 1 Veronica<small>3D model built 1:1 from the DWG · level +9.45 · revision 3: tour, lighting, measuring</small></h1>
+  <h1>Sketch 1 Veronica<small>3D model built 1:1 from the DWG · level +9.45 · revision 4: variants, tour, lighting, measuring</small></h1>
   <div class="meta"><span>Units <b>cm on plan</b></span><span>Clear height <b>2.75 m (assumed)</b></span><span>Source <b>להדמיה.dwg · AutoCAD 2018</b></span></div>
 </header>
 
@@ -117,6 +117,13 @@ pre.code{font:12px/1.5 var(--f-mono);background:var(--tint);border:1px solid var
       <span class="help" id="t-help">A 60 s walk through every room. Recording saves a WebM video of the tour when it ends.</span>
     </details>
     <details class="group" open><summary>Rooms</summary><div class="row" id="rooms"></div></details>
+    <details class="group" open><summary>Variants</summary>
+      <div class="row"><span class="help" style="width:auto;margin:0">TV-wall window</span>
+        <button class="v" id="v-tv-closed" type="button" aria-pressed="true">Closed (solid wall)</button><button class="v" id="v-tv-open" type="button" aria-pressed="false">Open</button></div>
+      <div class="row" style="margin-top:6px"><span class="help" style="width:auto;margin:0">Balcony</span>
+        <button class="v" id="v-bal-open" type="button" aria-pressed="true">Open, as drawn</button><button class="v" id="v-bal-enc" type="button" aria-pressed="false">Enclosed room</button></div>
+      <span class="help">Enclosed: glazing from the parapet to the slab on the three open sides, floor raised to the apartment level with parquet, outdoor furniture removed.</span>
+    </details>
     <details class="group"><summary>Step into</summary><div class="row" id="walk"></div>
       <div class="row" style="margin-top:6px"><button class="v" id="w-mode" type="button" aria-pressed="false">Walk mode (WASD)</button></div>
       <span class="help">In walk mode drag to look around and use W A S D or the arrow keys to move at eye level. You cannot walk through walls.</span>
@@ -178,6 +185,9 @@ pre.code{font:12px/1.5 var(--f-mono);background:var(--tint);border:1px solid var
 <figure><img src="bath_general.jpg" alt="Guest bathroom"><figcaption><b>Guest bathroom</b><span>full-length vanity</span></figcaption></figure>
 <figure><img src="utility_niche.jpg" alt="Utility niche"><figcaption><b>Utility niche</b><span>overhead cabinets above the washer</span></figcaption></figure>
 <figure><img src="living_from_entrance.jpg" alt="Entrance hall into the living room"><figcaption><b>Entrance hall into the living room</b><span></span></figcaption></figure>
+<figure><img src="enc_balcony_terrace.jpg" alt="Balcony enclosed as a room"><figcaption><b>Balcony enclosed as a room</b><span>glazing to the slab, parquet floor</span></figcaption></figure>
+<figure><img src="enc_exterior_balcony.jpg" alt="Enclosed balcony, façade"><figcaption><b>Enclosed balcony, façade</b><span></span></figcaption></figure>
+<figure><img src="enc_living.jpg" alt="Living room with the balcony enclosed"><figcaption><b>Living room with the balcony enclosed</b><span></span></figcaption></figure>
 <figure><img src="top_ortho.jpg" alt="Plan view, orthographic" style="aspect-ratio:13/16;object-fit:contain;background:#dfe3e6"><figcaption><b>Plan view, orthographic</b><span></span></figcaption></figure></div>
 
 <h2>Proof of fit</h2>
@@ -235,6 +245,7 @@ CUDA_VISIBLE_DEVICES=1 ~/miniconda3/envs/bpy/bin/python build_blender.py --quali
   <li><b>Light:</b> LED backlighting on the entrance mirror and both bathroom mirrors; a lit display cabinet with glass shelves.</li>
   <li><b>Utility:</b> overhead cabinets above the washing machine extended to the ceiling. The guest-bath vanity now runs the full length of the wall from the bathtub to the corner.</li>
   <li><b>Balcony:</b> artificial grass, two rattan armchairs with a side table along the railing, and a 1.4 m trampoline with a safety net at the north end.</li>
+  <li><b>Variants (revision 4):</b> the 50 cm window on the TV wall is shown closed as a solid wall by default and can be reopened in the viewer; the balcony can be switched to an enclosed room. The tour videos predate these variants and show the window open and the balcony as drawn.</li>
   <li><b>Still assumed:</b> 2.75 m clear height; door heights from the block names; the safe-room window at sill 100, 100 cm high; a 15 cm curb with glass railing. The building outside the apartment is not drawn on the plan and not modelled.</li>
 </ul>
 </div>
@@ -293,6 +304,16 @@ const ROOMS = [
   ['living','Living & hall','#c98a5a'], ['kitchen','Kitchen','#8d6b3f'], ['bedroom','Bedroom','#b57c80'], ['kids','Children / safe room','#89b7a5'],
   ['ensuite','En-suite','#6f9ab5'], ['guestbath','Guest bath','#5f87a0'], ['balcony','Balcony','#6e9a4f'], ['service','Service balcony','#8c8f93']];
 const roomOn = Object.fromEntries(ROOMS.map(r => [r[0], true]));
+const variant = {tv: 'closed', balcony: 'open'};
+const OUTDOOR = /__(armchair|side_table|trampoline|rail_|curb_)/;
+function variantVisible(o){
+  const n = o.name;
+  if (n.includes('infill_win_living_se')) return variant.tv === 'closed';
+  if (n.includes('win_living_se') && /^(WJamb|WHead|WSill|Pane)/.test(n)) return variant.tv === 'open';
+  if (n.includes('__enc_') || n === 'Floor__balcony__enc') return variant.balcony === 'enclosed';
+  if (OUTDOOR.test(n) || n.startsWith('Floor__balcony__0')) return variant.balcony === 'open';
+  return true;
+}
 const kinds = {ceil:[], furn:[], open:[], walls:[], floors:[]};
 const all = [], walls = [], floors = [], ledMats = new Map(), fixtures = [];
 function parse(name){
@@ -431,6 +452,9 @@ function applyHome(){
   for (const [room, m] of ledMats) { const on = homeOn[room]; m.emissive.copy(col); m.emissiveIntensity = on ? 2.5*B : 0.15; }
   $('h-master').checked = Object.values(homeOn).some(Boolean);
 }
+function setVariant(k, val){ variant[k] = val; const ids = k === 'tv' ? {closed:'v-tv-closed', open:'v-tv-open'} : {open:'v-bal-open', enclosed:'v-bal-enc'}; for (const [vv, id] of Object.entries(ids)) $(id).setAttribute('aria-pressed', String(vv === val)); applyAll(); }
+$('v-tv-closed').onclick = () => setVariant('tv', 'closed'); $('v-tv-open').onclick = () => setVariant('tv', 'open');
+$('v-bal-open').onclick = () => setVariant('balcony', 'open'); $('v-bal-enc').onclick = () => setVariant('balcony', 'enclosed');
 $('h-master').addEventListener('change', e => { setAllHome(e.target.checked); applyHome(); });
 for (const id of ['h-warm','h-bright']) $(id).addEventListener('input', applyHome);
 
@@ -459,7 +483,7 @@ function applyAll(){
   const show = {ceil: $('tg-ceil').checked, furn: $('tg-furn').checked, open: $('tg-open').checked, walls: true, floors: true};
   for (const o of all) {
     const anyRoom = o.userData.rooms.includes('all') || o.userData.rooms.some(r => roomOn[r] !== false);
-    o.visible = show[o.userData.kind] && anyRoom;
+    o.visible = show[o.userData.kind] && anyRoom && variantVisible(o);
   }
   renderer.shadowMap.enabled = $('tg-shadow').checked; sun.castShadow = renderer.shadowMap.enabled;
   const h = +$('l-cut').value; cut.constant = h; renderer.clippingPlanes = (h < 2.79 && !$('tg-ceil').checked) ? [cut] : [];
