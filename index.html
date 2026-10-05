@@ -114,7 +114,7 @@ pre.code{font:12px/1.5 var(--f-mono);background:var(--tint);border:1px solid var
         <button class="v" id="t-rec" type="button">⏺ Record tour</button>
         <button class="v" id="t-day" type="button">Play day cycle</button></div>
       <label class="t"><input type="checkbox" id="t-doors" checked> doors open as you approach</label>
-      <span class="help" id="t-help">A 60 s walk through every room. Recording saves a WebM video of the tour when it ends (downloads work on the public site, not inside the claude.ai viewer).</span>
+      <span class="help" id="t-help">A 60 s walk through every room. Recording saves a WebM video of the tour when it ends.</span>
     </details>
     <details class="group" open><summary>Rooms</summary><div class="row" id="rooms"></div></details>
     <details class="group"><summary>Step into</summary><div class="row" id="walk"></div>
@@ -306,7 +306,7 @@ function parse(name){
   return {rooms, kind};
 }
 const DOORS = JSON.parse($('doors').textContent); const TOUR = JSON.parse($('tour').textContent);
-const doorPivots = []; let sliderGroup = null, sliderOpen = 0;
+const doorPivots = []; let sliderGroup = null, sliderOpen = 0; let parquetTex = null, parquetRough = null;
 const glbEl = $('glb');
 const glbBytes = glbEl.dataset.src
   ? fetch(glbEl.dataset.src).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
@@ -327,7 +327,14 @@ glbBytes.then(bin => new GLTFLoader().parse(bin, '', gltf => {
         o.material = ledMats.get(key);
       }
       if (/screen/i.test(m.name)) { m.emissive = new THREE.Color(0x1a2230); m.emissiveIntensity = 0.6; }
-      if (/parquet/i.test(m.name) && m.map) { m.map.anisotropy = 8; m.roughness = 0.45; }
+      if (/parquet/i.test(m.name)) {
+        if (!parquetTex) {
+          const tl = new THREE.TextureLoader();
+          parquetTex = tl.load('herringbone_2k.jpg'); parquetTex.colorSpace = THREE.SRGBColorSpace; parquetTex.anisotropy = 8; parquetTex.wrapS = parquetTex.wrapT = THREE.ClampToEdgeWrapping; parquetTex.flipY = false;
+          parquetRough = tl.load('herringbone_rough_2k.jpg'); parquetRough.wrapS = parquetRough.wrapT = THREE.ClampToEdgeWrapping; parquetRough.flipY = false;
+        }
+        m.map = parquetTex; m.roughnessMap = parquetRough; m.roughness = 1.0; m.metalness = 0; m.color.set(0xffffff); m.needsUpdate = true;
+      }
       if (/tile|plaster|ceiling|concrete|paint|wallpaper/i.test(m.name)) { m.roughness = 0.8; }
     }
     if (/__(spot_\d+_lens|pendant_\d+_bulb)$/.test(o.name)) { const b = new THREE.Box3().setFromObject(o); fixtures.push({room: info.rooms[0], pos: b.getCenter(new THREE.Vector3()), pendant: /pendant/.test(o.name)}); }
@@ -519,14 +526,23 @@ function startRecording(){
   recorder = new MediaRecorder(stream, type ? {mimeType: type, videoBitsPerSecond: 12e6} : undefined); recChunks = [];
   recorder.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
   recorder.onstop = () => {
-    const blob = new Blob(recChunks, {type: 'video/webm'}); const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'veronica-tour.webm'; document.body.appendChild(a); a.click(); a.remove();
-    $('t-help').textContent = `Recording finished (${(blob.size/1e6).toFixed(1)} MB). If no download appeared, this host blocks downloads; use the public site.`;
+    const blob = new Blob(recChunks, {type: 'video/webm'});
+    saveFile('veronica-tour.webm', blob).then(msg => { $('t-help').textContent = `Recording finished (${(blob.size/1e6).toFixed(1)} MB). ${msg}`; });
     $('t-rec').disabled = false; $('t-rec').textContent = '⏺ Record tour';
   };
   recorder.start(500); $('t-rec').disabled = true; $('t-rec').textContent = '● Recording…';
 }
 $('t-rec').onclick = () => startTour(true);
+// save a generated file: through the claude.ai viewer's downloads capability when present, else a plain browser download
+async function saveFile(filename, blob){
+  const dl = window.claude?.use ? await window.claude.use('downloads') : null;
+  if (dl) {
+    try { await dl.save({filename, data: blob}); return 'Saved.'; }
+    catch (e) { return e?.code === 'declined' ? 'Save cancelled.' : 'Could not save here: ' + (e?.message || e); }
+  }
+  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000); return 'Download started.';
+}
 
 // ---------------- walk mode ----------------
 let walk = false; const keys = new Set(); let yaw = 0, pitch = 0, dragging = false, last = null;
