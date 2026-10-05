@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Interactive 3D model of an apartment plan, built 1:1 from the DWG.">
+<title>Sketch 1 Veronica</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: drafting-table page. Full-bleed model viewport with a control rail, then the plate of renders, then the proof section. */
+:root{
+  --paper:#f3f1ec; --ink:#1d1f22; --ink-2:#55585e; --line:#d9d5cc; --panel:#ffffff;
+  --accent:#d35f1c; --accent-ink:#fff; --tint:#e9e3d6;
+  --f-display:"Fraunces",Georgia,"Times New Roman",serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ color-scheme:dark; --paper:#17181b; --ink:#ebe8e1; --ink-2:#a2a49f; --line:#34363b; --panel:#1f2125; --accent:#e8793a; --accent-ink:#1a1a1a; --tint:#26282d; } }
+:root[data-theme="dark"]{ color-scheme:dark; --paper:#17181b; --ink:#ebe8e1; --ink-2:#a2a49f; --line:#34363b; --panel:#1f2125; --accent:#e8793a; --accent-ink:#1a1a1a; --tint:#26282d; }
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font:15px/1.55 var(--f-body);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1280px;margin:0 auto;padding-inline:20px;padding-block:0 48px}
+header.top{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 24px;padding-block:22px 14px;border-bottom:1px solid var(--line)}
+h1{font:600 30px/1.1 var(--f-display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1 small{display:block;font:500 13px/1.4 var(--f-body);color:var(--ink-2);letter-spacing:.06em;text-transform:uppercase;margin-top:6px}
+.meta{font-family:var(--f-mono);font-size:12.5px;color:var(--ink-2);display:flex;gap:18px;flex-wrap:wrap}
+.meta b{color:var(--ink);font-weight:500}
+h2{font:600 22px/1.2 var(--f-display);margin:36px 0 12px;text-wrap:balance}
+p{max-width:68ch;margin:0 0 10px}
+.muted{color:var(--ink-2)}
+/* viewer */
+.stage{position:relative;margin-top:18px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#c9d3dc}
+.stage canvas{display:block;width:100%;height:100%}
+.view{height:min(78vh,820px);min-height:420px}
+.rail{position:absolute;left:12px;top:12px;bottom:12px;width:min(300px,calc(100% - 24px));display:flex;flex-direction:column;gap:8px;overflow:auto;pointer-events:none}
+.rail > *{pointer-events:auto}
+.group{background:color-mix(in srgb,var(--panel) 93%,transparent);border:1px solid var(--line);border-radius:6px;padding:8px 9px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;backdrop-filter:blur(6px)}
+.group .lbl{font:500 11px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin:0 4px 2px 2px;width:100%}
+button.v{font:500 12.5px/1 var(--f-body);color:var(--ink);background:var(--tint);border:1px solid transparent;border-radius:4px;padding:7px 10px;cursor:pointer}
+button.v:hover{border-color:var(--ink-2)}
+button.v[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+button.v:focus-visible,label.t input:focus-visible,input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+label.t{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:3px 5px;cursor:pointer;border-radius:4px}
+label.t input{accent-color:var(--accent);margin:0}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:5px 9px;border-radius:999px;background:var(--tint);cursor:pointer;border:1px solid transparent;user-select:none}
+.chip[data-on="false"]{opacity:.45;text-decoration:line-through}
+.chip:hover{border-color:var(--ink-2)}
+.chip i{width:9px;height:9px;border-radius:50%;background:var(--sw)}
+.sl{display:grid;grid-template-columns:86px 1fr 44px;align-items:center;gap:8px;width:100%;font-size:12.5px}
+.sl output{font-family:var(--f-mono);font-size:11.5px;text-align:right;color:var(--ink-2)}
+input[type=range]{width:100%;accent-color:var(--accent);margin:0}
+.help{font-size:11.5px;color:var(--ink-2);line-height:1.35;width:100%}
+.mlabel{position:absolute;transform:translate(-50%,-130%);font:500 12px/1 var(--f-mono);color:#1d1f22;background:rgba(255,248,236,.95);border:1px solid #d35f1c;border-radius:4px;padding:4px 7px;pointer-events:none;white-space:nowrap;z-index:3}
+.mlabel.live{background:#d35f1c;color:#fff;border-color:#d35f1c}
+.hint{position:absolute;right:12px;bottom:10px;font:12px/1.3 var(--f-mono);color:#1d1f22;background:rgba(255,255,255,.75);padding:5px 8px;border-radius:4px}
+.loading{position:absolute;inset:0;display:grid;place-items:center;font:500 14px var(--f-mono);color:#1d1f22;background:#c9d3dc;z-index:2}
+/* plates */
+.plates{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+figure img{display:block;width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;background:#999}
+figure.wide{grid-column:1/-1}
+figure.wide img{aspect-ratio:3/2}
+figcaption{padding:9px 12px 11px;font-size:13px;color:var(--ink-2);display:flex;justify-content:space-between;gap:12px}
+figcaption b{color:var(--ink);font-weight:500}
+/* proof */
+.proof{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(280px,1fr);gap:20px;align-items:start}
+@media (max-width:820px){.proof{grid-template-columns:1fr}}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:500 11px/1.2 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+td.n{text-align:right;font-family:var(--f-mono)}
+.tbl{overflow-x:auto}
+.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:8px 0 14px}
+.kpi div{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.kpi b{display:block;font:600 24px/1.1 var(--f-display)}
+.kpi span{font:500 11px/1.3 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+ul.notes{padding-left:18px;margin:0;max-width:68ch}
+ul.notes li{margin-bottom:6px}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto!important}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <h1>Sketch 1 Veronica<small>3D model built 1:1 from the DWG · level +9.45 · revision 2 with the designer's corrections</small></h1>
+  <div class="meta"><span>Units <b>cm on plan</b></span><span>Clear height <b>2.75 m (assumed)</b></span><span>Source <b>להדמיה.dwg · AutoCAD 2018</b></span></div>
+</header>
+
+<div class="stage view" id="stage">
+  <div class="loading" id="loading">Loading model…</div>
+  <div class="rail">
+    <div class="group" id="views"><span class="lbl">View</span></div>
+    <div class="group" id="rooms"><span class="lbl">Rooms (click to hide / show)</span></div>
+    <div class="group" id="walk"><span class="lbl">Step into</span></div>
+    <div class="group">
+      <span class="lbl">Lighting</span>
+      <div class="sl"><span>Time of day</span><input type="range" id="l-time" min="5" max="22" step="0.25" value="13"><output id="o-time">13:00</output></div>
+      <div class="sl"><span>Sun</span><input type="range" id="l-sun" min="0" max="2" step="0.05" value="1"><output id="o-sun">1.00</output></div>
+      <div class="sl"><span>Exposure</span><input type="range" id="l-expo" min="0.3" max="2.2" step="0.05" value="1"><output id="o-expo">1.00</output></div>
+      <label class="t"><input type="checkbox" id="l-int"> interior lights</label>
+      <label class="t"><input type="checkbox" id="tg-shadow" checked> shadows</label>
+      <button class="v" id="l-night" type="button">Evening preset</button>
+      <button class="v" id="l-noon" type="button">Midday preset</button>
+    </div>
+    <div class="group" id="measure">
+      <span class="lbl">Measure</span>
+      <span class="help">Double-click on the model to start a line, move, then click to finish. Esc cancels. Points snap to nearby corners.</span>
+      <button class="v" id="m-clear" type="button">Clear measurements</button>
+      <span class="help" id="m-count"></span>
+    </div>
+    <div class="group">
+      <span class="lbl">Show</span>
+      <label class="t"><input type="checkbox" id="tg-ceil"> ceilings &amp; slab</label>
+      <label class="t"><input type="checkbox" id="tg-furn" checked> furniture</label>
+      <label class="t"><input type="checkbox" id="tg-open" checked> doors &amp; windows</label>
+      <div class="sl"><span>Wall cut</span><input type="range" id="l-cut" min="0.6" max="2.8" step="0.05" value="2.8"><output id="o-cut">full</output></div>
+    </div>
+  </div>
+  <div class="hint">drag to orbit · scroll to zoom · right-drag to pan</div>
+</div>
+
+<h2>Rendered views</h2>
+<p class="muted">Path-traced in Blender from the same model. Walls, openings and furniture sit exactly where the plan puts them; finishes follow the designer's brief (herringbone parquet, modern rustic, pastel children's room, artificial grass on the balcony).</p>
+<div class="plates" id="plates"><figure class=wide><img src="dollhouse_SE.jpg" alt="Dollhouse from the south-east"><figcaption><b>Dollhouse from the south-east</b><span>balcony and safe room nearest</span></figcaption></figure>
+<figure><img src="dollhouse_SW.jpg" alt="Dollhouse from the entrance side"><figcaption><b>Dollhouse from the entrance side</b><span></span></figcaption></figure>
+<figure><img src="exterior_balcony.jpg" alt="Balcony façade"><figcaption><b>Balcony façade</b><span>the orange-marked elevation on the sketch</span></figcaption></figure>
+<figure><img src="balcony_terrace.jpg" alt="Balcony"><figcaption><b>Balcony</b><span>artificial grass, armchairs, trampoline</span></figcaption></figure>
+<figure><img src="living.jpg" alt="Living room toward the balcony"><figcaption><b>Living room toward the balcony</b><span>herringbone parquet, linen sofa</span></figcaption></figure>
+<figure><img src="living_tv.jpg" alt="TV wall"><figcaption><b>TV wall</b><span>oak slat cladding</span></figcaption></figure>
+<figure><img src="kitchen.jpg" alt="Kitchen and island"><figcaption><b>Kitchen and island</b><span>fridge wall to the ceiling, island to the far end</span></figcaption></figure>
+<figure><img src="bedroom.jpg" alt="Bedroom"><figcaption><b>Bedroom</b><span>pink fluted panel behind the bed</span></figcaption></figure>
+<figure><img src="kids_room.jpg" alt="Children’s room (safe room)"><figcaption><b>Children’s room (safe room)</b><span>pastel walls and wallpaper</span></figcaption></figure>
+<figure><img src="bath_bedroom.jpg" alt="En-suite bathroom"><figcaption><b>En-suite bathroom</b><span>backlit mirror</span></figcaption></figure>
+<figure><img src="bath_general.jpg" alt="Guest bathroom"><figcaption><b>Guest bathroom</b><span>full-length vanity</span></figcaption></figure>
+<figure><img src="utility_niche.jpg" alt="Utility niche"><figcaption><b>Utility niche</b><span>overhead cabinets above the washer</span></figcaption></figure>
+<figure><img src="living_from_entrance.jpg" alt="Entrance hall into the living room"><figcaption><b>Entrance hall into the living room</b><span></span></figcaption></figure>
+<figure><img src="top_ortho.jpg" alt="Plan view, orthographic" style="aspect-ratio:13/16;object-fit:contain;background:#dfe3e6"><figcaption><b>Plan view, orthographic</b><span></span></figcaption></figure></div>
+
+<h2>Proof of fit</h2>
+<div class="proof">
+  <figure><img src="overlay.jpg" alt="Model footprint drawn over the PDF plan: wall outlines in red over the gray hatch, openings in blue, furniture in orange" style="aspect-ratio:auto;object-fit:contain;background:#fff">
+    <figcaption><b>Model over the PDF</b><span>red = model walls · blue = openings · orange = furniture</span></figcaption></figure>
+  <div>
+    <div class="kpi">
+      <div><b>50/57</b><span>plan dimensions land on a model edge (±0.5 cm)</span></div>
+      <div><b>9.34 m²</b><span>safe room, model (plan prints 9.29)</span></div>
+      <div><b>11</b><span>doors &amp; windows placed in their hatch gaps</span></div>
+    </div>
+    <div class="tbl"><table>
+      <thead><tr><th>Opening</th><th>Size (cm)</th><th>Sill</th><th>Where</th></tr></thead>
+      <tbody><tr><td>door entrance</td><td class=n>105 × 220</td><td class=n>—</td><td>west wall, into the hall</td></tr>
+<tr><td>door bath general</td><td class=n>86 × 210</td><td class=n>—</td><td>hall → guest bath</td></tr>
+<tr><td>door mamad</td><td class=n>81 × 200</td><td class=n>—</td><td>hall → safe room (steel, opens out)</td></tr>
+<tr><td>door bath bedroom</td><td class=n>76 × 210</td><td class=n>—</td><td>bedroom → en-suite</td></tr>
+<tr><td>door bedroom</td><td class=n>95 × 210</td><td class=n>—</td><td>hall → bedroom corridor</td></tr>
+<tr><td>win balcony slider</td><td class=n>240 × 230.5</td><td class=n>—</td><td>living room → balcony, sliding</td></tr>
+<tr><td>win bedroom</td><td class=n>160 × 202.5</td><td class=n>+28</td><td>bedroom, north, sliding</td></tr>
+<tr><td>win bath bedroom</td><td class=n>60 × 125</td><td class=n>+105</td><td>en-suite, north, tilt-turn</td></tr>
+<tr><td>win living se</td><td class=n>50 × 202.5</td><td class=n>+28</td><td>living room, south, fixed + shutter</td></tr>
+<tr><td>win kitchen</td><td class=n>140 × 125</td><td class=n>+105</td><td>kitchen → service balcony, 3 wings</td></tr>
+<tr><td>win mamad</td><td class=n>100 × 100</td><td class=n>+100</td><td>safe room, east, steel</td></tr></tbody>
+    </table></div>
+    <div class="tbl" style="margin-top:14px"><table>
+      <thead><tr><th>Room</th><th class="n">Floor area</th></tr></thead>
+      <tbody><tr><td>Living, kitchen, hall (open plan)</td><td class=n>35.66 m²</td></tr>
+<tr><td>Bedroom + corridor</td><td class=n>14.77 m²</td></tr>
+<tr><td>Balcony</td><td class=n>10.63 m²</td></tr>
+<tr><td>Children’s room (safe room)</td><td class=n>9.34 m²</td></tr>
+<tr><td>Guest bathroom</td><td class=n>4.38 m²</td></tr>
+<tr><td>En-suite bathroom</td><td class=n>3.88 m²</td></tr>
+<tr><td>Service balcony</td><td class=n>3.63 m²</td></tr></tbody>
+    </table></div>
+  </div>
+</div>
+
+<h2>Designer's corrections, revision 2</h2>
+<ul class="notes">
+  <li><b>Kitchen:</b> the whole refrigerator wall is now floor-to-ceiling oak cabinetry with an integrated fridge and oven column. The island runs to the far wall as drawn (227 cm), with the four stools in their plotted positions.</li>
+  <li><b>Finishes:</b> herringbone oak parquet in all living spaces, modern rustic palette (natural oak, light stone, matte black, linen). Oak slat cladding behind the TV, a dusty-pink fluted panel behind the master bed.</li>
+  <li><b>Children's room:</b> pastel mint walls with a dotted wallpaper on the long wall, pink and mint bedding.</li>
+  <li><b>Light:</b> LED backlighting on the entrance mirror and both bathroom mirrors; a lit display cabinet with glass shelves.</li>
+  <li><b>Utility:</b> overhead cabinets above the washing machine extended to the ceiling. The guest-bath vanity now runs the full length of the wall from the bathtub to the corner.</li>
+  <li><b>Balcony:</b> artificial grass, two rattan armchairs with a side table along the railing, and a 1.4 m trampoline with a safety net at the north end.</li>
+  <li><b>Still assumed:</b> 2.75 m clear height; door heights from the block names; the safe-room window at sill 100, 100 cm high; a 15 cm curb with glass railing. The building outside the apartment is not drawn on the plan and not modelled.</li>
+</ul>
+</div>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script id="glb" type="application/octet-stream" data-src="apartment.glb"></script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const S = 0.01;
+const $ = id => document.getElementById(id);
+const stage = $('stage');
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+stage.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xc9d3dc);
+const pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 200);
+const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.dampingFactor = 0.08; controls.maxPolarAngle = Math.PI*0.52;
+const hemi = new THREE.HemisphereLight(0xdfe8f2, 0x8a7a66, 0.55); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2e2, 2.6); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
+const sc = sun.shadow.camera; sc.near = 1; sc.far = 80; sc.left = -14; sc.right = 14; sc.top = 14; sc.bottom = -14;
+scene.add(sun); scene.add(sun.target);
+const toWorld = (x, y, z=0) => new THREE.Vector3(x*S, z*S, -y*S);
+const C = toWorld(1405, 1545, 0); sun.target.position.copy(C);
+
+// interior lights at the ceiling (same positions as the Blender render)
+const LIGHTS = [[1150,1300],[1450,1450],[1400,1700],[1400,2010],[1190,1800],[1400,1050],[1130,2060],[980,1030],[1000,1250],[1300,1450]];
+const interior = new THREE.Group(); interior.visible = false; scene.add(interior);
+for (const [x,y] of LIGHTS) { const p = new THREE.PointLight(0xffd9b0, 0, 7, 1.6); p.position.copy(toWorld(x, y, 262)); interior.add(p); }
+
+const ROOMS = [
+  ['living','Living & hall','#c98a5a'], ['kitchen','Kitchen','#8d6b3f'], ['bedroom','Bedroom','#b57c80'], ['kids','Children / safe room','#89b7a5'],
+  ['ensuite','En-suite','#6f9ab5'], ['guestbath','Guest bath','#5f87a0'], ['balcony','Balcony','#6e9a4f'], ['service','Service balcony','#8c8f93']];
+const roomOn = Object.fromEntries(ROOMS.map(r => [r[0], true]));
+const kinds = {ceil:[], furn:[], open:[], walls:[], floors:[]};
+const all = [];
+function parse(name){
+  // Type__roomA+roomB__rest
+  const m = /^([A-Za-z]+)__([a-z+]+)__/.exec(name);
+  const rooms = m ? m[2].split('+') : ['all'];
+  const t = m ? m[1] : name.split('_')[0];
+  let kind = 'furn';
+  if (t === 'Ceiling' || t === 'Roof') kind = 'ceil';
+  else if (t === 'Wall') kind = 'walls';
+  else if (t === 'Floor') kind = 'floors';
+  else if (/^(Jamb|Head|Leaf|Handle|Handle2|WJamb|WHead|WSill|Sash|SashV|SashT|SashB|Pane|PaneV|PaneH)$/.test(t)) kind = 'open';
+  return {rooms, kind};
+}
+const glbEl = $('glb');
+const glbBytes = glbEl.dataset.src
+  ? fetch(glbEl.dataset.src).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+  : Promise.resolve(Uint8Array.from(atob(glbEl.textContent.trim()), c => c.charCodeAt(0)).buffer);
+glbBytes.then(bin => new GLTFLoader().parse(bin, '', gltf => {
+  gltf.scene.traverse(o => {
+    if (!o.isMesh) return;
+    o.castShadow = true; o.receiveShadow = true;
+    const info = parse(o.name); o.userData = info; kinds[info.kind].push(o); all.push(o);
+    const m = o.material;
+    if (m) {
+      if (m.transparent) { m.depthWrite = false; m.side = THREE.DoubleSide; }
+      if (/mirror/i.test(m.name)) { m.metalness = 1; m.roughness = 0.03; }
+      if (/^glass|net/i.test(m.name)) { m.transparent = true; m.opacity = m.name === 'net' ? 0.35 : 0.28; m.roughness = 0.05; m.metalness = 0.1; m.depthWrite = false; }
+      if (/led/i.test(m.name)) { m.emissive = new THREE.Color(0xffd9a8); m.emissiveIntensity = 2.5; }
+      if (/screen/i.test(m.name)) { m.emissive = new THREE.Color(0x1a2230); m.emissiveIntensity = 0.6; }
+      if (/parquet/i.test(m.name) && m.map) { m.map.anisotropy = 8; m.roughness = 0.45; }
+      if (/tile|plaster|ceiling|concrete|paint|wallpaper/i.test(m.name)) { m.roughness = 0.8; }
+    }
+  });
+  scene.add(gltf.scene);
+  $('loading').remove();
+  setView('dollhouse'); applyAll();
+}, err => { $('loading').textContent = 'Could not load the model: ' + err; })).catch(err => { $('loading').textContent = 'Could not load the model: ' + err; });
+
+const VIEWS = {
+  dollhouse: {eye: toWorld(2500, 300, 1250), tgt: toWorld(1330,1560,60), ceil:false},
+  dollhouse_sw: {eye: toWorld(200, 150, 1250), tgt: toWorld(1330,1560,60), ceil:false},
+  top: {eye: toWorld(1405, 1545, 2600), tgt: toWorld(1405,1545,0), ceil:false},
+  balcony: {eye: toWorld(2350, 950, 420), tgt: toWorld(1690,1480,140), ceil:true},
+};
+const WALK = {
+  'Living room': [toWorld(1150,1430,160), toWorld(1700,1400,110)],
+  'TV wall': [toWorld(1480,1600,160), toWorld(1440,1230,100)],
+  'Kitchen': [toWorld(1370,1400,160), toWorld(1400,1800,100)],
+  'Bedroom': [toWorld(1268,1870,155), toWorld(1470,2060,95)],
+  'Children / safe room': [toWorld(1292,1065,155), toWorld(1520,1040,95)],
+  'En-suite': [toWorld(1205,2160,165), toWorld(1095,2000,90)],
+  'Guest bath': [toWorld(1050,1052,160), toWorld(915,1090,90)],
+  'Utility niche': [toWorld(1150,1180,160), toWorld(1130,940,110)],
+  'Balcony': [toWorld(1705,1240,165), toWorld(1860,1560,90)],
+};
+function flyTo(eye, tgt){
+  const e0 = camera.position.clone(), t0 = controls.target.clone(), t = performance.now();
+  const dur = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 650;
+  function step(now){
+    const k = dur ? Math.min(1, (now-t)/dur) : 1, s = k*k*(3-2*k);
+    camera.position.lerpVectors(e0, eye, s); controls.target.lerpVectors(t0, tgt, s); controls.update();
+    if (k < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+function mark(key){ document.querySelectorAll('#views button.v, #walk button.v').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.key === key))); }
+function setView(key){ const v = VIEWS[key]; $('tg-ceil').checked = v.ceil; flyTo(v.eye, v.tgt); applyAll(); mark(key); }
+const vb = $('views');
+for (const [k, label] of [['dollhouse','Dollhouse'],['dollhouse_sw','From the entrance side'],['top','Plan view'],['balcony','Balcony façade']]) {
+  const b = document.createElement('button'); b.className='v'; b.type='button'; b.textContent=label; b.dataset.key=k; b.setAttribute('aria-pressed','false'); b.onclick = () => setView(k); vb.appendChild(b);
+}
+const wb = $('walk');
+for (const [name, [eye, tgt]] of Object.entries(WALK)) {
+  const b = document.createElement('button'); b.className='v'; b.type='button'; b.textContent=name; b.dataset.key='walk:'+name; b.setAttribute('aria-pressed','false');
+  b.onclick = () => { $('tg-ceil').checked = true; $('l-cut').value = 2.8; flyTo(eye, tgt); applyAll(); mark('walk:'+name); }; wb.appendChild(b);
+}
+const rb = $('rooms');
+for (const [key, label, sw] of ROOMS) {
+  const c = document.createElement('span'); c.className = 'chip'; c.dataset.on = 'true'; c.dataset.room = key; c.style.setProperty('--sw', sw); c.tabIndex = 0; c.setAttribute('role','switch'); c.setAttribute('aria-checked','true');
+  c.innerHTML = `<i></i>${label}`;
+  const toggle = () => { roomOn[key] = !roomOn[key]; c.dataset.on = String(roomOn[key]); c.setAttribute('aria-checked', String(roomOn[key])); applyAll(); };
+  c.onclick = toggle; c.onkeydown = e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(); } };
+  rb.appendChild(c);
+}
+const allBtn = document.createElement('button'); allBtn.className='v'; allBtn.type='button'; allBtn.textContent='All on';
+allBtn.onclick = () => { for (const k in roomOn) roomOn[k] = true; rb.querySelectorAll('.chip').forEach(c => { c.dataset.on='true'; c.setAttribute('aria-checked','true'); }); applyAll(); };
+rb.appendChild(allBtn);
+
+// lighting
+const cut = new THREE.Plane(new THREE.Vector3(0, -1, 0), 2.8);
+function skyFor(t){ // t hours -> sky colour, sun colour, elevation
+  const day = Math.max(0, Math.sin(Math.PI*(t-5.5)/15.5));            // 0 at 5:30 and 21:00
+  const warm = Math.pow(1-day, 2.2);
+  const sky = new THREE.Color().setHSL(0.58 - 0.08*warm, 0.35 + 0.25*warm, 0.18 + 0.62*day);
+  const sunc = new THREE.Color().lerpColors(new THREE.Color(0xffb070), new THREE.Color(0xfff4e6), Math.min(1, day*1.4));
+  return {day, sky, sunc};
+}
+function applyLighting(){
+  const t = +$('l-time').value, k = +$('l-sun').value, ex = +$('l-expo').value;
+  const {day, sky, sunc} = skyFor(t);
+  const az = Math.PI*(t-6)/12;                  // east at 6:00 -> west at 18:00
+  const el = Math.max(0.05, Math.sin(Math.PI*(t-5.5)/15.5))*1.15;   // radians-ish elevation
+  const R = 30; const dir = new THREE.Vector3(Math.cos(el)*Math.cos(az), Math.sin(el), Math.cos(el)*Math.sin(az)*0.6 + 0.5*Math.cos(el));
+  // place the sun relative to the apartment centre; plan south is +z (y-up, plan y -> -z)
+  sun.position.copy(C).addScaledVector(new THREE.Vector3(dir.x, dir.y, dir.z).normalize(), R);
+  sun.intensity = 3.0*k*Math.pow(day, 0.8); sun.color.copy(sunc);
+  hemi.intensity = 0.15 + 0.55*day; hemi.color.copy(sky);
+  scene.background = sky; renderer.toneMappingExposure = ex;
+  const intOn = $('l-int').checked; interior.visible = intOn; interior.children.forEach(p => p.intensity = intOn ? 18 : 0);
+  $('o-time').textContent = `${String(Math.floor(t)).padStart(2,'0')}:${String(Math.round((t%1)*60)).padStart(2,'0')}`;
+  $('o-sun').textContent = k.toFixed(2); $('o-expo').textContent = ex.toFixed(2);
+}
+function applyAll(){
+  const show = {ceil: $('tg-ceil').checked, furn: $('tg-furn').checked, open: $('tg-open').checked, walls: true, floors: true};
+  for (const o of all) {
+    const anyRoom = o.userData.rooms.includes('all') || o.userData.rooms.some(r => roomOn[r] !== false);
+    o.visible = show[o.userData.kind] && anyRoom;
+  }
+  renderer.shadowMap.enabled = $('tg-shadow').checked; sun.castShadow = renderer.shadowMap.enabled;
+  const h = +$('l-cut').value; cut.constant = h; renderer.clippingPlanes = (h < 2.79 && !$('tg-ceil').checked) ? [cut] : [];
+  $('o-cut').textContent = h < 2.79 ? h.toFixed(2)+' m' : 'full';
+  applyLighting();
+  scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
+}
+for (const id of ['tg-ceil','tg-furn','tg-open','tg-shadow','l-int']) $(id).addEventListener('change', applyAll);
+for (const id of ['l-time','l-sun','l-expo']) $(id).addEventListener('input', applyLighting);
+$('l-cut').addEventListener('input', applyAll);
+$('l-night').onclick = () => { $('l-time').value = 19.5; $('l-int').checked = true; $('l-expo').value = 1.3; applyAll(); };
+$('l-noon').onclick = () => { $('l-time').value = 13; $('l-int').checked = false; $('l-expo').value = 1.0; $('l-sun').value = 1; applyAll(); };
+
+// ---------------- measurement tool ----------------
+const ray = new THREE.Raycaster(); const ndc = new THREE.Vector2();
+const mGroup = new THREE.Group(); scene.add(mGroup);
+const measures = []; let live = null; let downAt = null; let lastFinish = 0;
+const sphereGeo = new THREE.SphereGeometry(0.022, 16, 12);
+const matLine = new THREE.LineBasicMaterial({color:0xd35f1c, depthTest:false, transparent:true});
+const matDot = new THREE.MeshBasicMaterial({color:0xd35f1c, depthTest:false, transparent:true});
+function pick(ev){
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((ev.clientX - r.left)/r.width)*2 - 1, -((ev.clientY - r.top)/r.height)*2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const cutOn = renderer.clippingPlanes.length > 0, cutH = cut.constant;
+  const hits = ray.intersectObjects(all.filter(o => o.visible), false).filter(h => !cutOn || h.point.y <= cutH + 1e-3);
+  if (!hits.length) return null;
+  const h = hits[0]; let p = h.point.clone();
+  // snap to the nearest vertex of the hit face when it is close on screen (12 px)
+  if (h.face && h.object.geometry?.attributes?.position) {
+    const pos = h.object.geometry.attributes.position; let best = null, bd = 12;
+    for (const vi of [h.face.a, h.face.b, h.face.c]) {
+      const v = new THREE.Vector3().fromBufferAttribute(pos, vi).applyMatrix4(h.object.matrixWorld);
+      const sp = v.clone().project(camera); const dx = (sp.x - ndc.x)*r.width/2, dy = (sp.y - ndc.y)*r.height/2;
+      const d = Math.hypot(dx, dy); if (d < bd) { bd = d; best = v; }
+    }
+    if (best) p = best;
+  }
+  return p;
+}
+function fmt(a, b){
+  const d = a.distanceTo(b); const h = Math.hypot(a.x-b.x, a.z-b.z);
+  let t = d >= 1 ? d.toFixed(2)+' m' : Math.round(d*100)+' cm';
+  if (Math.abs(d - h) > 0.01) t += `  (plan ${h >= 1 ? h.toFixed(2)+' m' : Math.round(h*100)+' cm'})`;
+  return t;
+}
+function makeMeasure(a){
+  const geo = new THREE.BufferGeometry().setFromPoints([a, a.clone()]);
+  const line = new THREE.Line(geo, matLine); line.renderOrder = 999;
+  const s1 = new THREE.Mesh(sphereGeo, matDot), s2 = new THREE.Mesh(sphereGeo, matDot); s1.position.copy(a); s2.position.copy(a); s1.renderOrder = s2.renderOrder = 999;
+  const label = document.createElement('div'); label.className = 'mlabel live'; label.textContent = '0 cm'; stage.appendChild(label);
+  mGroup.add(line, s1, s2);
+  return {a, b: a.clone(), line, s1, s2, label};
+}
+function updateMeasure(m, b){
+  m.b.copy(b); m.s2.position.copy(b); m.line.geometry.setFromPoints([m.a, m.b]); m.label.textContent = fmt(m.a, m.b);
+}
+function finish(){
+  if (!live) return;
+  if (live.a.distanceTo(live.b) < 0.01) { removeMeasure(live); } else { live.label.classList.remove('live'); measures.push(live); }
+  live = null; lastFinish = performance.now(); updateCount();
+}
+function removeMeasure(m){ mGroup.remove(m.line, m.s1, m.s2); m.line.geometry.dispose(); m.label.remove(); }
+function updateCount(){ $('m-count').textContent = measures.length ? `${measures.length} measurement${measures.length>1?'s':''}` : ''; }
+const cv = renderer.domElement;
+cv.addEventListener('dblclick', ev => { if (performance.now() - lastFinish < 500) return; const p = pick(ev); if (!p) return; if (live) { updateMeasure(live, p); finish(); } else { live = makeMeasure(p); } });
+cv.addEventListener('pointerdown', ev => { downAt = [ev.clientX, ev.clientY]; });
+cv.addEventListener('pointerup', ev => {
+  if (!live || !downAt) return; const moved = Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]); downAt = null;
+  if (moved < 5 && ev.button === 0) { const p = pick(ev); if (p) { updateMeasure(live, p); finish(); } }
+});
+cv.addEventListener('pointermove', ev => { if (!live) return; const p = pick(ev); if (p) updateMeasure(live, p); });
+window.addEventListener('keydown', ev => { if (ev.key === 'Escape' && live) { removeMeasure(live); live = null; } });
+$('m-clear').onclick = () => { for (const m of measures) removeMeasure(m); measures.length = 0; if (live) { removeMeasure(live); live = null; } updateCount(); };
+function placeLabels(){
+  const r = renderer.domElement.getBoundingClientRect(); const sr = stage.getBoundingClientRect();
+  for (const m of (live ? [...measures, live] : measures)) {
+    const mid = m.a.clone().add(m.b).multiplyScalar(0.5).project(camera);
+    const x = (mid.x + 1)/2*r.width + (r.left - sr.left), y = (1 - mid.y)/2*r.height + (r.top - sr.top);
+    m.label.style.left = x + 'px'; m.label.style.top = y + 'px'; m.label.style.display = (mid.z < 1) ? '' : 'none';
+  }
+}
+
+function resize(){ const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w/h; camera.updateProjectionMatrix(); }
+new ResizeObserver(resize).observe(stage); resize();
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); placeLabels(); });
+</script>
+
+</body>
+</html>
